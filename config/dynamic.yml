@@ -1,0 +1,14 @@
+http:
+  routers:
+    laravel:
+      rule: "Host(`localhost`)"
+      service: laravel_service
+      entryPoints:
+        - web
+
+  services:
+    laravel_service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:8000"
+
