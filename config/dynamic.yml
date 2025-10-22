@@ -1,10 +1,16 @@
+tls:
+  certificates:
+    - certFile: "./config/certs/localhost.crt"
+      keyFile: "./config/certs/localhost.key"
+
 http:
   routers:
     laravel:
       rule: "Host(`localhost`)"
-      service: laravel_service
       entryPoints:
-        - web
+        - websecure
+      service: laravel_service
+      tls: {}
 
   services:
     laravel_service:
