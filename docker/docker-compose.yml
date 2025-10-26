@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   traefik:
     image: traefik:v3.5
@@ -9,7 +7,6 @@ services:
       - --providers.docker=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
-      # فایل پیکربندی TLS را لود کن
       - --providers.file.filename=/etc/traefik/dynamic.yml
     ports:
       - "80:80"
@@ -21,9 +18,9 @@ services:
       - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.http-catchall.rule=HostRegexp(`{any:.+}`)"
-      - "traefik.http.routers.http-catchall.entrypoints=web"
-      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
+      - "traefik.http.routers.laravel-http.rule=Host(`laravel.localhost`)"
+      - "traefik.http.routers.laravel-http.entrypoints=web"
+      - "traefik.http.routers.laravel-http.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
 
   app:

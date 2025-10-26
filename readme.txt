@@ -12,21 +12,24 @@ traefik --configFile=traefik.yml --api.dashboard.entrypoints=dashboard
 
 brew install mkcert
 mkcert -install
-mkcert localhost laravel.test
-# خروجی: localhost+1-key.pem localhost+1.pem
-# rename them:
-mv localhost+1.pem traefik/certs/localhost.crt
-mv localhost+1-key.pem traefik/certs/localhost.key
+mkcert laravel.localhost
+
+
+laravel.localhost.pem        # گواهی
+laravel.localhost-key.pem    # کلید خصوصی
+
 
 
 
 
 /etc/hosts اضافه کن
 
-برای دسترسی به laravel.test لوکالی:
+برای دسترسی به laravel.localhost لوکالی:
 
 ویرایش کن /etc/hosts و خط زیر اضافه کن (با دسترسی sudo):
 
-127.0.0.1 laravel.test
+127.0.0.1 laravel.localhost
+
+
 
 
