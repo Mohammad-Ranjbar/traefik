@@ -1,0 +1,116 @@
+#!/bin/bash
+set -e
+
+# ------------------------------
+# تابع کمک برای چاپ رنگی
+# ------------------------------
+info() { echo -e "\033[1;34m[INFO]\033[0m $1"; }
+warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+error() { echo -e "\033[1;31m[ERROR]\033[0m $1"; }
+
+# ------------------------------
+# پرسش محیط
+# ------------------------------
+echo "Choose environment:"
+echo "1) Local"
+echo "2) Server (Production)"
+read -p "Enter 1 or 2: " ENV
+
+read -p "Enter your domain (e.g., laravel.localhost or example.com): " DOMAIN
+
+CERT_DIR="./certs"
+mkdir -p $CERT_DIR
+
+# ------------------------------
+# Local environment
+# ------------------------------
+if [ "$ENV" == "1" ]; then
+    info "Setting up local environment for $DOMAIN..."
+
+    # نصب mkcert اگر موجود نبود
+    if ! command -v mkcert &> /dev/null; then
+        warn "mkcert not found. Installing..."
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            brew install mkcert
+        else
+            sudo apt install mkcert -y
+        fi
+    fi
+
+    # نصب CA محلی
+    mkcert -install
+
+    # ساخت گواهی
+    mkcert -cert-file "$CERT_DIR/$DOMAIN.pem" -key-file "$CERT_DIR/$DOMAIN-key.pem" "$DOMAIN"
+    info "Certificates created in $CERT_DIR"
+
+    # اضافه کردن به /etc/hosts
+    if ! grep -q "$DOMAIN" /etc/hosts; then
+        echo "127.0.0.1 $DOMAIN" | sudo tee -a /etc/hosts
+        info "$DOMAIN added to /etc/hosts"
+    fi
+
+    # ایجاد dynamic.yml برای Traefik
+    cat > ./dynamic.yml <<EOL
+tls:
+  certificates:
+    - certFile: /certs/$DOMAIN.pem
+      keyFile: /certs/$DOMAIN-key.pem
+EOL
+    info "dynamic.yml created for Traefik"
+
+    # یادآوری به کاربر
+    info "Local setup complete. Mount $CERT_DIR in Traefik and use $DOMAIN as Host."
+    exit 0
+fi
+
+# ------------------------------
+# Server environment
+# ------------------------------
+if [ "$ENV" == "2" ]; then
+    info "Setting up server environment for $DOMAIN..."
+
+    read -p "Enter email for Let's Encrypt registration: " EMAIL
+
+    # ایجاد dynamic.yml برای Traefik با Let's Encrypt
+    cat > ./dynamic.yml <<EOL
+tls:
+  certificatesResolvers:
+    lets-encrypt:
+      acme:
+        email: $EMAIL
+        storage: acme.json
+        httpChallenge:
+          entryPoint: web
+EOL
+    touch acme.json
+    chmod 600 acme.json
+
+    info "dynamic.yml created with Let's Encrypt configuration"
+
+    # ایجاد docker-compose.override.yml برای Router و Service
+    cat > ./docker-compose.override.yml <<EOL
+services:
+  traefik:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${DOMAIN}.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.${DOMAIN}.entrypoints=websecure"
+      - "traefik.http.routers.${DOMAIN}.tls.certresolver=lets-encrypt"
+
+  app:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${DOMAIN}.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.${DOMAIN}.entrypoints=websecure"
+      - "traefik.http.routers.${DOMAIN}.tls=true"
+      - "traefik.http.services.${DOMAIN}.loadbalancer.server.port=8000"
+EOL
+
+    info "docker-compose.override.yml created for Traefik + Laravel"
+    info "Server setup complete. Run 'docker-compose up -d' to start services."
+    exit 0
+fi
+
+error "Invalid environment selected. Exiting."
+exit 1
